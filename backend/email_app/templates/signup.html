@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Talking Mail Box - Sign Up</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap');
+        
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #6B73FF 0%, #000DFF 100%);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: #333;
+        }
+        
+        .header {
+            color: white;
+            text-align: center;
+            margin-top: 2rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header h1 {
+            font-size: 3rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+        
+        .signup-box {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            padding: 2.5rem;
+            width: 90%;
+            max-width: 450px;
+            margin-top: 1.5rem;
+        }
+        
+        .signup-box h2 {
+            color: #3A3A3A;
+            text-align: center;
+            margin-bottom: 2rem;
+            font-size: 1.8rem;
+        }
+        
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #4A4A4A;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #E0E0E0;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+        
+        .form-group input:focus {
+            border-color: #6B73FF;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(107, 115, 255, 0.2);
+        }
+        
+        .submit-btn {
+            width: 100%;
+            padding: 14px;
+            background: #6B73FF;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 1rem;
+        }
+        
+        .submit-btn:hover {
+            background: #5A63F0;
+            transform: translateY(-2px);
+        }
+        
+        .voice-status {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background: #F8F9FA;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 0.9rem;
+            color: #5A5A5A;
+        }
+        
+        .requirements {
+            font-size: 0.8rem;
+            color: #6B73FF;
+            margin-top: 0.3rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>TALKING MAIL BOX</h1>
+        <p>Your voice-controlled email solution</p>
+    </div>
+    
+    <div class="signup-box">
+        <h2>Sign Up</h2>
+        
+        <form id="signupForm" method="post" action="{% url 'process_signup' %}">
+            {% csrf_token %}
+            
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" name="email" required>
+                <div class="requirements">Must be a valid email address</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required minlength="6">
+                <div class="requirements">Minimum 6 characters (letters, numbers, or symbols)</div>
+            </div>
+            
+            <button type="submit" class="submit-btn">Create Account</button>
+        </form>
+        
+        <div class="voice-status" id="voiceStatus">
+            Voice system ready. Say "Start Sign Up" to begin.
+        </div>
+    </div>
+
+    <script>
+        // Voice Interaction System
+        const synth = window.speechSynthesis;
+        const voiceStatus = document.getElementById('voiceStatus');
+        const form = document.getElementById('signupForm');
+        let currentField = null;
+        let recognition = null;
+        let currentStep = 'init';
+        let userData = {
+            username: '',
+            email: '',
+            password: ''
+        };
+    
+        // Speak with callback and delay control
+        function speak(text, callback, delay = 1000) {
+            console.log("[System] Speaking:", text);
+            if (synth.speaking) {
+                synth.cancel();
+            }
+            
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 0.9;
+            utterance.pitch = 1;
+            
+            if (callback) {
+                utterance.onend = () => {
+                    setTimeout(callback, delay);
+                };
+            }
+            
+            synth.speak(utterance);
+            voiceStatus.textContent = text;
+        }
+    
+        // Start field recognition with verification
+        function startFieldRecognition(fieldType) {
+            console.log("[System] Starting recognition for", fieldType);
+            currentStep = fieldType;
+            
+            if (recognition) {
+                recognition.stop();
+            }
+    
+            recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 3; // Get more alternatives for better accuracy
+    
+            recognition.onstart = () => {
+                console.log("[System] Listening for", fieldType);
+                speak(`Please say your ${fieldType} now.`);
+            };
+    
+            recognition.onresult = (event) => {
+                // Get the most confident result
+                const transcript = event.results[0][0].transcript.trim();
+                console.log("[User] Said:", transcript);
+                
+                // Store the value
+                userData[fieldType] = transcript;
+                document.getElementById(fieldType).value = transcript;
+                
+                // Verify each field individually
+                verifyField(fieldType, transcript);
+            };
+    
+            recognition.onerror = (event) => {
+                console.error("[System] Recognition error:", event.error);
+                speak("Sorry, I didn't catch that. Please try again.", () => {
+                    startFieldRecognition(fieldType);
+                });
+            };
+    
+            recognition.start();
+        }
+    
+        // Verify each field with user confirmation
+        function verifyField(fieldType, value) {
+            let verificationPrompt = '';
+            let validation = true;
+            
+            switch (fieldType) {
+                case 'username':
+                    verificationPrompt = `You said "${value}" as your username. Is this correct? Say YES or NO.`;
+                    break;
+                case 'email':
+                    if (!validateEmail(value)) {
+                        verificationPrompt = "That doesn't sound like a valid email. Please try again.";
+                        validation = false;
+                    } else {
+                        verificationPrompt = `You said "${value}" as your email. Is this correct? Say YES or NO.`;
+                    }
+                    break;
+                case 'password':
+                    if (value.length < 6) {
+                        verificationPrompt = "Password must be at least 6 characters. Please try again.";
+                        validation = false;
+                    } else {
+                        verificationPrompt = `You set your password. Is this correct? Say YES or NO.`;
+                    }
+                    break;
+            }
+    
+            if (!validation) {
+                speak(verificationPrompt, () => {
+                    startFieldRecognition(fieldType);
+                });
+                return;
+            }
+    
+            speak(verificationPrompt, () => {
+                startConfirmation(fieldType);
+            });
+        }
+    
+        // Field-specific confirmation with improved YES/NO detection
+        function startConfirmation(fieldType) {
+            if (recognition) {
+                recognition.stop();
+            }
+    
+            recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 3; // Get more alternatives
+    
+            recognition.onstart = () => {
+                console.log("[System] Listening for confirmation");
+            };
+    
+            recognition.onresult = (event) => {
+                // Check all alternatives for YES/NO
+                const results = event.results[0];
+                let response = '';
+                
+                // Check each alternative for YES/NO
+                for (let i = 0; i < results.length; i++) {
+                    const transcript = results[i].transcript.trim().toLowerCase();
+                    console.log(`[User] Alternative ${i}:`, transcript);
+                    
+                    if (transcript.includes('yes')) {
+                        response = 'yes';
+                        break;
+                    } else if (transcript.includes('no')) {
+                        response = 'no';
+                        break;
+                    }
+                }
+    
+                if (response === 'yes') {
+                    speak("Confirmed. Thank you.", () => {
+                        proceedToNextStep(fieldType);
+                    });
+                } else if (response === 'no') {
+                    speak("Let's try that again.", () => {
+                        startFieldRecognition(fieldType);
+                    });
+                } else {
+                    // If no clear YES/NO detected
+                    speak("I didn't hear a clear YES or NO. Please say YES to confirm or NO to re-enter.", () => {
+                        startConfirmation(fieldType);
+                    });
+                }
+            };
+    
+            recognition.onerror = (event) => {
+                console.error("[System] Confirmation error:", event.error);
+                speak("Sorry, I didn't understand. Please say YES or NO.", () => {
+                    startConfirmation(fieldType);
+                });
+            };
+    
+            recognition.start();
+        }
+    
+        // Proceed to next step after confirmation
+        function proceedToNextStep(currentFieldType) {
+            switch (currentFieldType) {
+                case 'username':
+                    currentField = document.getElementById('email');
+                    currentField.focus();
+                    speak("Moving to email. Please say your email address.", () => {
+                        startFieldRecognition('email');
+                    });
+                    break;
+                case 'email':
+                    currentField = document.getElementById('password');
+                    currentField.focus();
+                    speak("Moving to password. Please say your password.", () => {
+                        startFieldRecognition('password');
+                    });
+                    break;
+                case 'password':
+                    finalConfirmation();
+                    break;
+            }
+        }
+    
+        // Final confirmation of all details
+        function finalConfirmation() {
+            speak(`Please confirm all details. Username: ${userData.username}. Email: ${userData.email}. Password: set. Is everything correct? Say YES to create account or NO to start over.`, () => {
+                if (recognition) {
+                    recognition.stop();
+                }
+    
+                recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+                recognition.continuous = false;
+                recognition.interimResults = false;
+                recognition.maxAlternatives = 3;
+    
+                recognition.onresult = (event) => {
+                    const results = event.results[0];
+                    let response = '';
+                    
+                    for (let i = 0; i < results.length; i++) {
+                        const transcript = results[i].transcript.trim().toLowerCase();
+                        if (transcript.includes('yes')) {
+                            response = 'yes';
+                            break;
+                        } else if (transcript.includes('no')) {
+                            response = 'no';
+                            break;
+                        }
+                    }
+    
+                    if (response === 'yes') {
+                        speak("Creating your account now. Please wait...", () => {
+                            form.submit();
+                        });
+                    } else if (response === 'no') {
+                        speak("Starting over.", () => {
+                            resetForm();
+                            currentField = document.getElementById('username');
+                            currentField.focus();
+                            startFieldRecognition('username');
+                        });
+                    } else {
+                        speak("Please say YES to confirm or NO to start over.", () => {
+                            finalConfirmation();
+                        });
+                    }
+                };
+    
+                recognition.start();
+            });
+        }
+    
+        // Reset form data
+        function resetForm() {
+            userData = {
+                username: '',
+                email: '',
+                password: ''
+            };
+            document.getElementById('username').value = '';
+            document.getElementById('email').value = '';
+            document.getElementById('password').value = '';
+        }
+    
+        // Email validation
+        function validateEmail(email) {
+            return email.includes('@') && email.includes('.') && email.length > 5;
+        }
+    
+        // Initialize voice system
+        function initializeVoiceSystem() {
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                voiceStatus.textContent = "Voice commands not supported in your browser.";
+                return;
+            }
+            
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(() => {
+                    speak("Welcome to Talking Mail Box. Say 'Start Sign Up' to begin.", () => {
+                        startCommandRecognition();
+                    });
+                })
+                .catch(() => {
+                    voiceStatus.textContent = "Please allow microphone access.";
+                });
+        }
+    
+        // Start command recognition
+        function startCommandRecognition() {
+            recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            recognition.continuous = true;
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 3;
+    
+            recognition.onresult = (event) => {
+                const results = event.results[0];
+                let detectedCommand = false;
+                
+                for (let i = 0; i < results.length; i++) {
+                    const transcript = results[i].transcript.trim().toLowerCase();
+                    if (transcript.includes('start sign up') || transcript.includes('sign up')) {
+                        detectedCommand = true;
+                        break;
+                    }
+                }
+    
+                if (detectedCommand) {
+                    recognition.stop();
+                    startVoiceSignup();
+                }
+            };
+    
+            recognition.start();
+        }
+    
+        // Start signup process
+        function startVoiceSignup() {
+            speak("Starting voice sign up process.", () => {
+                currentField = document.getElementById('username');
+                currentField.focus();
+                startFieldRecognition('username');
+            });
+        }
+    
+        // Initialize on page load
+        window.onload = () => {
+            setTimeout(initializeVoiceSystem, 500);
+        };
+    </script>
+</body>
+</html>
