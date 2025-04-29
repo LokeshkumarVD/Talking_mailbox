@@ -17,14 +17,14 @@ def signup(request):
 #view for process_signup page
 def process_signup(request):
     # Just a temporary dummy view to fix the error
-    return render(request, 'signup_success.html')  # (make sure you have this template or adjust as needed)
+    return render(request, 'dashboard.html')  # (make sure you have this template or adjust as needed)
 
-# View for Login Page
-def login_page(request):
+# View for SignIn Page
+def signin(request):
     if request.method == 'POST':
         # We'll later add voice-based login handling here
-        return redirect('inbox')  # After login, go to Inbox
-    return render(request, 'login.html')
+        return redirect('dashboard')  # After login, go to Inbox
+    return render(request, 'signin.html')
 
 # View for Compose Page
 def compose_page(request):

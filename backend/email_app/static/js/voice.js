@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     document.body.addEventListener('click', function () {
         if (recognition) {
-            speakAndListen("Welcome to Talking Mailbox. Please say your email address after the beep.", 'email');
+            speakAndListen("Welcome to The Sign in Page. Please say your email .", 'email');
         }
     }, { once: true });
 
@@ -71,7 +71,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function validateEmail(email) {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (emailRegex.test(email)) {
-            speakAndListen("Email received. Now, please say your password after the beep.", 'password');
+            speakAndListen("Email received. Now, please say your password .", 'password');
         } else {
             speakAndListen("That doesn't seem like a valid email address. Please try again.", 'email');
         }
