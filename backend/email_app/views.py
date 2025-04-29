@@ -2,6 +2,8 @@ from django.shortcuts import render
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.hashers import make_password  # For password hashing
+from .models import TalkingMailboxUser
 
 # Create your views here.
 
@@ -17,7 +19,25 @@ def signup(request):
 #view for process_signup page
 def process_signup(request):
     # Just a temporary dummy view to fix the error
-    return render(request, 'dashboard.html')  # (make sure you have this template or adjust as needed)
+    if request.method == 'POST':
+        # Get data from voice input (sent via AJAX/fetch)
+        username = request.POST.get('username')
+        email = request.POST.get('email')
+        password = request.POST.get('password')
+        
+        # Create and save user (with hashed password)
+        try:
+            user = TalkingMailboxUser.objects.create(
+                username=username,
+                email=email,
+                password=make_password(password),  # Hash the password
+            )
+            return redirect('dashboard')  # Redirect after successful signup
+        except Exception as e:
+            messages.error(request, f"Error: {e}")
+            return redirect('signup')
+    
+    return redirect('signup')  # Fallback if not POST
 
 # View for SignIn Page
 def signin(request):

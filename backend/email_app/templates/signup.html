@@ -353,52 +353,70 @@
     
         // Final confirmation of all details
         function finalConfirmation() {
-            speak(`Please confirm all details. Username: ${userData.username}. Email: ${userData.email}. Password: set. Is everything correct? Say YES to create account or NO to start over.`, () => {
-                if (recognition) {
-                    recognition.stop();
+    speak(`Please confirm all details. Username: ${userData.username}. Email: ${userData.email}. Password: set. Is everything correct? Say YES to create account or NO to start over.`, () => {
+        if (recognition) recognition.stop();
+
+        recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 3;
+
+        recognition.onresult = (event) => {
+            const results = event.results[0];
+            let response = '';
+            
+            for (let i = 0; i < results.length; i++) {
+                const transcript = results[i].transcript.trim().toLowerCase();
+                if (transcript.includes('yes')) {
+                    response = 'yes';
+                    break;
+                } else if (transcript.includes('no')) {
+                    response = 'no';
+                    break;
                 }
-    
-                recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-                recognition.continuous = false;
-                recognition.interimResults = false;
-                recognition.maxAlternatives = 3;
-    
-                recognition.onresult = (event) => {
-                    const results = event.results[0];
-                    let response = '';
-                    
-                    for (let i = 0; i < results.length; i++) {
-                        const transcript = results[i].transcript.trim().toLowerCase();
-                        if (transcript.includes('yes')) {
-                            response = 'yes';
-                            break;
-                        } else if (transcript.includes('no')) {
-                            response = 'no';
-                            break;
+            }
+
+            if (response === 'yes') {
+                speak("Creating your account now. Please wait...", () => {
+                    // NEW FORM SUBMISSION CODE (preserves your flow)
+                    const form = document.getElementById('signupForm');
+                    const formData = {
+                        username: userData.username,
+                        email: userData.email,
+                        password: userData.password,
+                        csrfmiddlewaretoken: document.querySelector('[name=csrfmiddlewaretoken]').value
+                    };
+
+                    fetch(form.action, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': formData.csrfmiddlewaretoken
+                        },
+                        body: JSON.stringify(formData)
+                    }).then(response => {
+                        if (response.redirected) {
+                            window.location.href = response.url;
                         }
-                    }
-    
-                    if (response === 'yes') {
-                        speak("Creating your account now. Please wait...", () => {
-                            form.submit();
-                        });
-                    } else if (response === 'no') {
-                        speak("Starting over.", () => {
-                            resetForm();
-                            currentField = document.getElementById('username');
-                            currentField.focus();
-                            startFieldRecognition('username');
-                        });
-                    } else {
-                        speak("Please say YES to confirm or NO to start over.", () => {
-                            finalConfirmation();
-                        });
-                    }
-                };
-    
-                recognition.start();
-            });
-        }
+                    });
+                });
+            } else if (response === 'no') {
+                speak("Starting over.", () => {
+                    resetForm();
+                    currentField = document.getElementById('username');
+                    currentField.focus();
+                    startFieldRecognition('username');
+                });
+            } else {
+                speak("Please say YES to confirm or NO to start over.", () => {
+                    finalConfirmation();
+                });
+            }
+        };
+
+        recognition.start();
+    });
+}
     
         // Reset form data
         function resetForm() {
