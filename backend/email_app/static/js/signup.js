@@ -108,5 +108,116 @@ document.addEventListener('DOMContentLoaded', function () {
             .replace('underscore', '_');  // if someone says 'underscore'
         return formatted;
     }
+    function handleVoiceConfirmation(response) {
+        if (response === 'yes') {
+            speak("Creating your account. Please wait...");
+    
+            const name = document.getElementById("name").value;
+            const email = document.getElementById("email").value;
+            const password = document.getElementById("password").value;
+    
+            fetch('/signup/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    name: name,
+                    email: email,
+                    password: password
+                })
+            })
+            .then(response => response.json())  // Convert to JSON
+            .then(data => {
+                if (data.status === "success") {  // Check for success status
+                    speak("Signup successful. Redirecting to your dashboard.");
+                    setTimeout(() => {
+                        window.location.href = "/dashboard/";  // Redirect to dashboard
+                    }, 2000);  // Wait for 2 seconds to finish TTS before redirecting
+                } else {
+                    speak("There was a problem creating your account. Please try again.");
+                }
+            })
+            .catch(error => {
+                console.error("Signup fetch error:", error);
+                speak("Network error. Please try again.");
+            });
+        } else {
+            speak("Account creation canceled. Please refresh the page to start again.");
+        }
+    }
+    
+    
+    // After gathering user inputs (name, email, password)
+    function confirmSignup() {
+        speak("Do you want to create your account? Say 'yes' to confirm.");
+    
+        listenForConfirmation((confirmation) => {
+            if (confirmation === 'yes') {
+                const userData = {
+                    name: document.getElementById('name').value,
+                    email: document.getElementById('email').value,
+                    password: document.getElementById('password').value
+                };
+    
+                fetch('/signup/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken')
+                    },
+                    body: JSON.stringify(userData)
+                })
+                .then(response => {
+                    if (response.ok) {
+                        speak("Account created successfully.");
+                        window.location.href = "/dashboard/";
+                    } else {
+                        speak("Error creating account. Please try again.");
+                    }
+                })
+                .catch(error => {
+                    console.error('Fetch error:', error);
+                    speak("There was a network error. Please try again.");
+                });
+            } else {
+                speak("Account creation canceled.");
+            }
+        });
+    }
+    
+function listenForConfirmation(callback) {
+    // Implement speech recognition logic here to capture 'yes' or 'no' response
+    // Once 'yes' is heard, call the callback with the response
+    recognition.start();
+
+    recognition.onresult = function (event) {
+        const response = event.results[0][0].transcript.trim().toLowerCase();
+        callback(response);
+    };
+
+    recognition.onerror = function () {
+        speak("Sorry, I didn't catch that. Please say yes or no.");
+        listenForConfirmation(callback);
+    };
+
+}
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            // Does this cookie string begin with the name we want?
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
 
 });
