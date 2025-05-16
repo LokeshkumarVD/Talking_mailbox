@@ -30,7 +30,7 @@ def signup(request):
                     hashed_password = make_password(password)
                     user = TalkingMailboxUser(name=name, email=email, password=hashed_password)
                     user.save()
-                    return JsonResponse({"status": "success"}, status=200)
+                    return JsonResponse({"status": "success","redirect_url": "/dashboard/"}, status=200)
                 else:
                     return JsonResponse({"error": "Missing fields"}, status=400)
             except Exception as e:
@@ -63,7 +63,7 @@ def process_signup(request):
                     email=email,
                     password=hashed_password
                 )
-                return JsonResponse({"status": "success"}, status=200)
+                return JsonResponse({"status": "success","redirect_url": "/dashboard/"}, status=200)
             else:
                 return JsonResponse({"error": "Missing fields"}, status=400)
         except Exception as e:

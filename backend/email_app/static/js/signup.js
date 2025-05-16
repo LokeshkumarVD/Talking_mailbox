@@ -70,7 +70,8 @@ document.addEventListener('DOMContentLoaded', function () {
     function validatePassword(password) {
         // Accept password if it's at least 6 characters long
         if (password.length >= 6) {
-            speakAndListen("Password received. Confirming your details. Please say 'Yes' to confirm or 'No' to retry.", 'confirmation');
+            speak("Password received. Confirming your details. Please say 'Yes' to confirm or 'No' to retry.");
+            listenForConfirmation(handleVoiceConfirmation);
         } else {
             speakAndListen("Password is too weak. Please ensure it has at least 6 characters.", 'password');
         }
@@ -100,13 +101,26 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function formatEmail(spokenText) {
-        let formatted = spokenText.toLowerCase()
-            .replace(/\s/g, '')          // remove spaces
-            .replace('attherate', '@')    // if someone says 'attherate'
-            .replace('at', '@')           // if someone says 'at'
-            .replace('dot', '.')          // if someone says 'dot'
-            .replace('underscore', '_');  // if someone says 'underscore'
-        return formatted;
+      let formatted = spokenText.toLowerCase()
+        .replace(/\s/g, '')                     // remove spaces
+        .replace(/at the rate|attherate|at/g, '@')    // variations for @
+        .replace(/dot/g, '.')                   // dot
+        .replace(/underscore/g, '_')            // _
+        .replace(/dash|hyphen/g, '-')           // -
+        .replace(/plus/g, '+')                  // +
+        .replace(/comma/g, ',')                 // ,
+        .replace(/star/g, '*')                  // *
+        .replace(/hash/g, '#')                  // #
+        .replace(/percent/g, '%')               // %
+        .replace(/and/g, '&')                   // &
+        .replace(/dollar/g, '$')                // $
+        .replace(/question mark|questionmark/g, '?')
+        .replace(/exclamation mark|exclamationmark/g, '!')
+        .replace(/colon/g, ':')
+        .replace(/semicolon/g, ';');
+
+    return formatted;
+
     }
     function handleVoiceConfirmation(response) {
         if (response === 'yes') {
@@ -148,44 +162,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
     
-    
-    // After gathering user inputs (name, email, password)
-    function confirmSignup() {
-        speak("Do you want to create your account? Say 'yes' to confirm.");
-    
-        listenForConfirmation((confirmation) => {
-            if (confirmation === 'yes') {
-                const userData = {
-                    name: document.getElementById('name').value,
-                    email: document.getElementById('email').value,
-                    password: document.getElementById('password').value
-                };
-    
-                fetch('/signup/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': getCookie('csrftoken')
-                    },
-                    body: JSON.stringify(userData)
-                })
-                .then(response => {
-                    if (response.ok) {
-                        speak("Account created successfully.");
-                        window.location.href = "/dashboard/";
-                    } else {
-                        speak("Error creating account. Please try again.");
-                    }
-                })
-                .catch(error => {
-                    console.error('Fetch error:', error);
-                    speak("There was a network error. Please try again.");
-                });
-            } else {
-                speak("Account creation canceled.");
-            }
-        });
-    }
     
 function listenForConfirmation(callback) {
     // Implement speech recognition logic here to capture 'yes' or 'no' response

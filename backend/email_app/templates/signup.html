@@ -353,7 +353,7 @@
     
         // Final confirmation of all details
         function finalConfirmation() {
-    speak(`Please confirm all details. Username: ${userData.username}. Email: ${userData.email}. Password: set. Is everything correct? Say YES to create account or NO to start over.`, () => {
+        speak(`Please confirm all details. Username: ${userData.username}. Email: ${userData.email}. Password: set. Is everything correct? Say YES to create account or NO to start over.`, () => {
         if (recognition) recognition.stop();
 
         recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
@@ -494,6 +494,34 @@
         window.onload = () => {
             setTimeout(initializeVoiceSystem, 500);
         };
+        form.addEventListener('submit', function(e) {
+    e.preventDefault(); // Prevent default form submission
+
+    const formData = new FormData(form);
+
+    fetch(form.action, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            speak("Account created successfully. Redirecting you now.", () => {
+                window.location.href = data.redirect_url;
+            });
+        } else {
+            speak(data.message || "Signup failed. Please try again.");
+        }
+    })
+    .catch(error => {
+        console.error("Signup error:", error);
+        speak("There was a problem signing you up. Please try again.");
+    });
+});
+
     </script>
 </body>
 </html>
