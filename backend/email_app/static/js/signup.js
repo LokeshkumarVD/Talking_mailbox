@@ -147,7 +147,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (data.status === "success") {  // Check for success status
                     speak("Signup successful. Redirecting to your dashboard.");
                     setTimeout(() => {
-                        window.location.href = "/dashboard/";  // Redirect to dashboard
+                        window.location.href = data.redirect_url || "/dashboard/";  // Redirect to dashboard
                     }, 2000);  // Wait for 2 seconds to finish TTS before redirecting
                 } else {
                     speak("There was a problem creating your account. Please try again.");

@@ -388,17 +388,25 @@
                     };
 
                     fetch(form.action, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRFToken': formData.csrfmiddlewaretoken
-                        },
-                        body: JSON.stringify(formData)
-                    }).then(response => {
-                        if (response.redirected) {
-                            window.location.href = response.url;
-                        }
-                    });
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': formData.csrfmiddlewaretoken
+    },
+    body: JSON.stringify(formData)
+})
+.then(response => response.json())
+.then(data => {
+    if (data.status === "success" && data.redirect_url) {
+        window.location.href = data.redirect_url;
+    } else {
+        speak(data.error || "Signup failed. Please try again.");
+    }
+})
+.catch(error => {
+    console.error("Signup error:", error);
+    speak("There was a problem signing you up. Please try again.");
+});
                 });
             } else if (response === 'no') {
                 speak("Starting over.", () => {
