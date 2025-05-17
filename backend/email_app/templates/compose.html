@@ -1,0 +1,181 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Compose - Talking Mailbox</title>
+    <style>
+        body {
+            background: #121212;
+            color: white;
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        .compose-box {
+            background-color: #1e1e1e;
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 600px;
+            margin: 50px auto;
+        }
+        .compose-box h2 {
+            margin-bottom: 20px;
+            color: #00ffd5;
+        }
+        .field {
+            margin-bottom: 20px;
+        }
+        .field label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .field input, .field textarea {
+            width: 100%;
+            padding: 10px;
+            border-radius: 6px;
+            border: none;
+            font-size: 16px;
+        }
+        .status {
+            margin-top: 20px;
+            font-weight: bold;
+            color: #0f0;
+        }
+    </style>
+</head>
+<body>
+    <div class="compose-box">
+        <h2>Voice Compose</h2>
+        <div class="field">
+            <label>To:</label>
+            <input type="text" id="to" readonly>
+        </div>
+        <div class="field">
+            <label>Subject:</label>
+            <input type="text" id="subject" readonly>
+        </div>
+        <div class="field">
+            <label>Message:</label>
+            <textarea id="message" rows="6" readonly></textarea>
+        </div>
+        <div class="status" id="statusMsg">Listening for your commands...</div>
+    </div>
+
+    <script>
+        let step = 'to';  // track current step
+        let to = '', subject = '', message = '';
+
+        window.onload = () => {
+            speak("Welcome to Compose. Please say the recipient email address.");
+            startRecognition();
+        };
+
+        function speak(text) {
+            const utter = new SpeechSynthesisUtterance(text);
+            speechSynthesis.speak(utter);
+        }
+
+        function startRecognition() {
+            const recognition = new webkitSpeechRecognition();
+            recognition.lang = 'en-US';
+            recognition.interimResults = false;
+            recognition.continuous = false;
+
+            recognition.onresult = (event) => {
+                let spoken = event.results[0][0].transcript.trim();
+                document.getElementById("statusMsg").textContent = "Heard: " + spoken;
+
+                if (step === 'to') {
+                    to = spoken.replace(/\s+/g, '').toLowerCase();
+                    document.getElementById('to').value = to;
+                    speak("You said " + to + ". Now say the subject.");
+                    step = 'subject';
+                } else if (step === 'subject') {
+                    subject = spoken;
+                    document.getElementById('subject').value = subject;
+                    speak("Subject recorded. Now say the message.");
+                    step = 'message';
+                } else if (step === 'message') {
+                    message = spoken;
+                    document.getElementById('message').value = message;
+                    speak("Message recorded. Say 'send mail' to send, or 'repeat' to try again.");
+                    step = 'send';
+                } else if (step === 'send') {
+                    let cmd = spoken.toLowerCase();
+                    if (cmd.includes('send mail') || cmd.includes('send email')) {
+                        sendEmail();
+                    } else if (cmd.includes('repeat')) {
+                        speak("Let's start again. Please say the recipient email address.");
+                        resetForm();
+                    } else {
+                        speak("Say 'send mail' to send or 'repeat' to try again.");
+                    }
+                }
+            };
+
+            recognition.onerror = (e) => {
+                speak("I didn't catch that. Please try again.");
+            };
+
+            recognition.onend = () => {
+                if (step !== 'done') {
+                    recognition.start();  // keep listening
+                }
+            };
+
+            recognition.start();
+        }
+
+        function resetForm() {
+            step = 'to';
+            to = subject = message = '';
+            document.getElementById('to').value = '';
+            document.getElementById('subject').value = '';
+            document.getElementById('message').value = '';
+        }
+
+        function sendEmail() {
+            // Send data to Django backend with fetch POST
+            fetch("{% url 'compose' %}", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": getCookie('csrftoken'),
+                },
+                body: JSON.stringify({ to, subject, message }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                if(data.success) {
+                    speak("Email sent successfully. Redirecting to sent mails.");
+                    step = 'done';
+                    setTimeout(() => { window.location.href = "{% url 'sent' %}"; }, 4000);
+                } else {
+                    speak("Failed to send email. Please try again.");
+                    step = 'send';
+                }
+            })
+            .catch(() => {
+                speak("Error sending email. Please try again.");
+                step = 'send';
+            });
+        }
+
+        // Helper function to get CSRF token cookie
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+    </script>
+</body>
+</html>
