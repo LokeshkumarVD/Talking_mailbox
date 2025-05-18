@@ -4,6 +4,7 @@ from django.http import JsonResponse
 from django.shortcuts import render, redirect
 from django.contrib.auth.hashers import make_password, check_password
 from .models import TalkingMailboxUser, Email
+from django.contrib.auth import authenticate, login
 
 # View for Landing Page
 def landing_page(request):
@@ -60,28 +61,40 @@ def process_signup(request):
 
 
 # View for Signin
-@csrf_exempt
 def signin(request):
-    if request.method == 'POST':
-        if request.content_type == 'application/json':
-            try:
-                data = json.loads(request.body)
-                email = data.get('email')
-                password = data.get('password')
-
-                user = TalkingMailboxUser.objects.get(email=email)
-
-                if check_password(password, user.password):
-                    request.session['user_id'] = user.id
-                    return JsonResponse({"status": "success", "redirect_url": "/dashboard/"})
-                else:
-                    return JsonResponse({"error": "Invalid password"}, status=400)
-            except TalkingMailboxUser.DoesNotExist:
-                return JsonResponse({"error": "User not found"}, status=404)
-            except Exception as e:
-                return JsonResponse({"error": str(e)}, status=500)
+    if request.method == "POST":
+        email = request.POST['email']
+        password = request.POST['password']
+        user = authenticate(request, username=email, password=password)
+        if user:
+            login(request, user)
+            return redirect('dashboard')
+        else:
+            return render(request, 'signin.html', {'error': 'Invalid credentials'})
     return render(request, 'signin.html')
 
+#view for process_signin page
+@csrf_exempt  # If you use @csrf_exempt, make sure CSRF is handled in AJAX (which your JS does)
+def process_signin(request):
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+            email = data.get('email', '').strip()
+            password = data.get('password', '').strip()
+        except Exception:
+            return JsonResponse({'success': False, 'message': 'Invalid data.'})
+
+        try:
+            user_obj = TalkingMailboxUser.objects.get(email=email)
+        except TalkingMailboxUser.DoesNotExist:
+            return JsonResponse({'success': False, 'message': 'Invalid email or password.'})
+
+        if check_password(password, user_obj.password):
+            request.session['user_id'] = user_obj.id
+            return JsonResponse({'success': True, 'redirect_url': '/dashboard/'})
+        else:
+            return JsonResponse({'success': False, 'message': 'Invalid email or password.'})
+    return JsonResponse({'success': False, 'message': 'Invalid request.'})
 
 # View for Dashboard
 def dashboard_page(request):
@@ -120,6 +133,15 @@ def compose_page(request):
         except Exception as e:
             return JsonResponse({"success": False, "error": str(e)})
     return render(request, "compose.html")
+
+#View for Sent mail
+def sent_mail_page(request):
+    user_id = request.session.get('user_id')
+    if not user_id:
+        return redirect('signin')
+    user = TalkingMailboxUser.objects.get(id=user_id)
+    sent_mails = Email.objects.filter(owner=user, folder='sent').order_by('-sent_at')
+    return render(request, 'sent.html', {'sent_mails': sent_mails})
 
 
 # View for Inbox

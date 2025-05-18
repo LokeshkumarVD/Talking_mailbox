@@ -1,0 +1,166 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Sent Mail – Talking Mailbox</title>
+    <style>
+        body {
+            background: #121212;
+            color: white;
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        .sent-box {
+            background-color: #1e1e1e;
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 700px;
+            margin: 50px auto;
+        }
+        .sent-box h2 {
+            margin-bottom: 20px;
+            color: #00ffd5;
+        }
+        .mail-list {
+            margin-top: 20px;
+        }
+        .mail-item {
+            background: #232323;
+            border-radius: 8px;
+            padding: 18px;
+            margin-bottom: 18px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .mail-item.selected, .mail-item:hover {
+            background: #222e2e;
+            border: 2px solid #00ffd5;
+        }
+        .mail-to {
+            color: #00ffd5;
+            font-weight: bold;
+        }
+        .mail-subject {
+            font-size: 1.1rem;
+            margin: 6px 0;
+        }
+        .mail-message {
+            color: #b2f7ef;
+            margin-top: 8px;
+        }
+        .status {
+            margin-top: 20px;
+            font-weight: bold;
+            color: #0f0;
+        }
+    </style>
+</head>
+<body>
+    <div class="sent-box">
+        <h2>Sent Mail</h2>
+        <div class="status" id="statusMsg">Loading your sent mails...</div>
+        <div class="mail-list" id="mailList">
+            <!-- Example mails, replace with Django context in production -->
+            {% for mail in sent_mails %}
+            <div class="mail-item" tabindex="0" data-mail="{{ mail.id }}">
+                <div class="mail-to">To: {{ mail.to }}</div>
+                <div class="mail-subject">Subject: {{ mail.subject }}</div>
+                <div class="mail-message">{{ mail.message }}</div>
+            </div>
+            {% empty %}
+            <div>No sent mails found.</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <script>
+        // --- Voice greeting and instructions ---
+        window.onload = () => {
+            speak("Welcome to your sent mail page.", () => {
+                speak("Here you can review all the emails you have sent. Click or say the number of a mail to select it. Say 'read mail' to hear the selected mail read aloud.");
+                document.getElementById('statusMsg').textContent = "Say 'read mail' to hear the selected mail.";
+                startRecognition();
+            });
+        };
+
+        // --- Text-to-speech ---
+        function speak(text, callback) {
+            const utter = new SpeechSynthesisUtterance(text);
+            utter.rate = 1;
+            utter.onend = () => { if (callback) setTimeout(callback, 400); };
+            speechSynthesis.speak(utter);
+        }
+
+        // --- Voice recognition ---
+        function startRecognition() {
+            window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'en-US';
+            recognition.interimResults = false;
+            recognition.continuous = true;
+
+            recognition.onresult = (event) => {
+                const transcript = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
+                document.getElementById('statusMsg').textContent = `Heard: "${transcript}"`;
+
+                if (transcript.includes('read mail') || transcript.includes('read message')) {
+                    readSelectedMail();
+                } else if (transcript.match(/mail (\d+)/)) {
+                    // User said "mail 2" or "mail 1" etc.
+                    const idx = parseInt(transcript.match(/mail (\d+)/)[1], 10) - 1;
+                    selectMailByIndex(idx);
+                }
+            };
+
+            recognition.onerror = () => {
+                document.getElementById('statusMsg').textContent = "Voice recognition error. Please try again.";
+            };
+
+            recognition.onend = () => {
+                recognition.start();
+            };
+
+            recognition.start();
+        }
+
+        // --- Mail selection and reading ---
+        function selectMailByIndex(idx) {
+            const mails = document.querySelectorAll('.mail-item');
+            if (mails[idx]) {
+                mails.forEach(m => m.classList.remove('selected'));
+                mails[idx].classList.add('selected');
+                mails[idx].focus();
+                speak(`Mail ${idx + 1} selected. Say 'read mail' to hear its content.`);
+            } else {
+                speak("That mail number does not exist.");
+            }
+        }
+
+        function readSelectedMail() {
+            const selected = document.querySelector('.mail-item.selected') || document.querySelector('.mail-item');
+            if (selected) {
+                const to = selected.querySelector('.mail-to').textContent;
+                const subject = selected.querySelector('.mail-subject').textContent;
+                const message = selected.querySelector('.mail-message').textContent;
+                speak(`${to}. ${subject}. Message: ${message}`);
+            } else {
+                speak("No mail is selected.");
+            }
+        }
+
+        // --- Allow click to select mail ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const mails = document.querySelectorAll('.mail-item');
+            mails.forEach((mail, idx) => {
+                mail.addEventListener('click', () => {
+                    mails.forEach(m => m.classList.remove('selected'));
+                    mail.classList.add('selected');
+                    mail.focus();
+                    speak(`Mail ${idx + 1} selected. Say 'read mail' to hear its content.`);
+                });
+            });
+        });
+    </script>
+</body>
+</html>

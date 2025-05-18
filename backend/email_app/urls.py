@@ -4,8 +4,10 @@ from . import views
 urlpatterns = [
     path('',views.landing_page,name='landing'),
     path('signup/', views.signup, name='signup'),
-     path('process_signup/', views.process_signup, name='process_signup'),
+    path('process_signup/', views.process_signup, name='process_signup'),
     path('signin/', views.signin,name='signin'),
+    path('process_signin/', views.process_signin, name='process_signin'),
+
     path('dashboard/', views.dashboard_page, name='dashboard'),
     path('compose/', views.compose_page, name='compose'),
     path('inbox/', views.inbox_page, name='inbox'),

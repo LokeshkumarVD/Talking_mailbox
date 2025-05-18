@@ -1,132 +1,229 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>The Talking Mailbox - Dashboard</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background-image: url("{% static 'assets/bg.jpg' %}"); /* Django static path */
-            background-size: cover;
-            background-position: center;
-            font-family: Arial, sans-serif;
-            color: white;
-            height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .dashboard-box {
-            background-color: rgba(0, 0, 0, 0.7);
-            padding: 40px;
-            border-radius: 20px;
-            text-align: center;
-            box-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
-        }
-
-        .dashboard-box h1 {
-            margin-bottom: 30px;
-            font-size: 36px;
-            color: #00ffd5;
-        }
-
-        .option-btn {
-            display: block;
-            margin: 15px auto;
-            padding: 12px 30px;
-            background-color: #00ffd5;
-            color: black;
-            border: none;
-            border-radius: 10px;
-            font-size: 18px;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-
-        .option-btn:hover {
-            background-color: #00c8a9;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>Dashboard – The Talking Mailbox</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: #f5f7fa;
+      color: #222;
+    }
+    header {
+      background-color: #4285F4;
+      color: white;
+      padding: 1.2rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 1.2rem;
+    }
+    .container {
+      display: flex;
+    }
+    .toolbar {
+      width: 220px;
+      background-color: #eaf1fb;
+      height: calc(100vh - 66px);
+      border-right: 1px solid #ccc;
+      padding-top: 1rem;
+    }
+    .toolbar ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .toolbar li {
+      padding: 12px 20px;
+      font-size: 1.1rem;
+      cursor: pointer;
+      transition: background 0.3s;
+      border-radius: 8px;
+      margin-bottom: 6px;
+    }
+    .toolbar li:hover, .toolbar li.active {
+      background-color: #d2e3fc;
+    }
+    .main-content {
+      flex-grow: 1;
+      padding: 3rem;
+      text-align: center;
+      background: url("{% static 'assets/bg.jpg' %}") center/cover no-repeat;
+      min-height: calc(100vh - 66px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .main-content h2 {
+      font-size: 2rem;
+      color: #4285F4;
+    }
+    #instruction {
+      font-size: 1.1rem;
+      color: #444;
+    }
+    #actionFeedback {
+      margin-top: 2rem;
+      font-style: italic;
+      font-size: 1.1rem;
+      border: 2px dashed #ccc;
+      padding: 1rem;
+      width: 70%;
+      margin-left: auto;
+      margin-right: auto;
+      border-radius: 10px;
+      background-color: #fff;
+      color: #222;
+    }
+    #voiceStatus {
+      margin-left: 1rem;
+      font-size: 1rem;
+      color: #ffe066;
+    }
+  </style>
 </head>
 <body>
-    <div class="dashboard-box">
-        <h1>Welcome to Your Dashboard</h1>
-        <button class="option-btn" onclick="redirectToPage('compose')">Compose</button>
-        <button class="option-btn" onclick="redirectToPage('inbox')">Inbox</button>
-        <button class="option-btn" onclick="redirectToPage('sent')">Sent</button>
-        <button class="option-btn" onclick="redirectToPage('star')">Star</button>
-        <button class="option-btn" onclick="redirectToPage('trash')">Trash</button>
-        <button class="option-btn" onclick="redirectToPage('archive')">Archive</button>
-    </div>
+  <header>
+    <h1>The Talking Mailbox</h1>
+    <span id="voiceStatus">🎤 Voice Assistant: Listening...</span>
+  </header>
 
-    <script>
-        window.onload = function() {
-            setTimeout(startVoiceInteraction, 1000);  // optional delay
-        };
+  <div class="container">
+    <!-- Toolbar Section -->
+    <nav class="toolbar">
+      <ul>
+        <li id="compose" onclick="redirectTo('compose')">📧 Compose</li>
+        <li id="inbox" onclick="redirectTo('inbox')">📥 Inbox</li>
+        <li id="sent" onclick="redirectTo('sent')">📤 Sent</li>
+        <li id="starred" onclick="redirectTo('starred')">⭐ Starred</li>
+        <li id="trash" onclick="redirectTo('trash')">🗑️ Trash</li>
+        <li id="archive" onclick="redirectTo('archive')">🗄️ Archive</li>
+        <li id="logout" onclick="redirectTo('logout')">🚪 Logout</li>
+      </ul>
+    </nav>
 
-        function startVoiceInteraction() {
-            const msg = new SpeechSynthesisUtterance("Welcome to your dashboard. Please say one of the following options: Compose, Inbox, Sent, Star, Trash or Archive.");
-            msg.onend = function() {
-                listenForCommand();
-            };
-            speechSynthesis.speak(msg);
+    <!-- Main Content -->
+    <main class="main-content">
+      <h2 id="greeting">Welcome!</h2>
+      <p id="instruction">Speak a command like "Compose", "Inbox", "Sent", "Starred", "Trash", "Archive", or "Logout".</p>
+      <div id="actionFeedback">Waiting for your voice command...</div>
+    </main>
+  </div>
+
+  <script>
+    // Speech recognition setup
+    window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new window.SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = false;
+
+    const actionFeedback = document.getElementById("actionFeedback");
+    const greeting = document.getElementById("greeting");
+    const voiceStatus = document.getElementById("voiceStatus");
+
+    // Commands and corresponding actions
+    const commands = {
+      "compose": () => {
+        handleCommand("compose", "Opening Compose...");
+        setTimeout(() => redirectTo('compose'), 1500);
+      },
+      "inbox": () => {
+        handleCommand("inbox", "Opening Inbox...");
+        setTimeout(() => redirectTo('inbox'), 1500);
+      },
+      "sent": () => {
+        handleCommand("sent", "Opening Sent Mail...");
+        setTimeout(() => redirectTo('sent'), 1500);
+      },
+      "starred": () => {
+        handleCommand("starred", "Opening Starred...");
+        setTimeout(() => redirectTo('starred'), 1500);
+      },
+      "trash": () => {
+        handleCommand("trash", "Opening Trash...");
+        setTimeout(() => redirectTo('trash'), 1500);
+      },
+      "archive": () => {
+        handleCommand("archive", "Opening Archive...");
+        setTimeout(() => redirectTo('archive'), 1500);
+      },
+      "logout": () => {
+        speak("Logging out. Goodbye!");
+        actionFeedback.textContent = "Logging out...";
+        setTimeout(() => redirectTo('logout'), 1800);
+      }
+    };
+
+    // Voice greeting on page load
+    document.addEventListener('DOMContentLoaded', () => {
+      const user = localStorage.getItem("username") || "User";
+      greeting.textContent = `Welcome, ${user}!`;
+      speak(`Welcome ${user}. Please say a command like Compose, Inbox, Sent, Starred, Trash, Archive, or Logout.`);
+      recognition.start();
+    });
+
+    // Text-to-speech function
+    function speak(message) {
+      const synth = window.speechSynthesis;
+      synth.cancel();  // Prevent overlapping speech
+      const utter = new SpeechSynthesisUtterance(message);
+      utter.rate = 1;
+      synth.speak(utter);
+      voiceStatus.textContent = "🎤 Voice Assistant: " + message;
+    }
+
+    // Handle voice recognition result
+    recognition.onresult = (event) => {
+      const transcript = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
+      actionFeedback.textContent = `Heard: "${transcript}"`;
+
+      for (let cmd in commands) {
+        if (transcript.includes(cmd)) {
+          commands[cmd]();
+          highlightToolbar(cmd);
+          return;
         }
+      }
+      speak("Sorry, I didn't catch a valid command. Please try again.");
+    };
 
-        function listenForCommand() {
-            if (!('webkitSpeechRecognition' in window)) {
-                alert("Your browser does not support speech recognition.");
-                return;
-            }
+    recognition.onerror = (event) => {
+      actionFeedback.textContent = `Error: ${event.error}`;
+      voiceStatus.textContent = "🎤 Voice Assistant: Error";
+    };
 
-            const recognition = new webkitSpeechRecognition();
-            recognition.lang = 'en-US';
-            recognition.continuous = false;
-            recognition.interimResults = false;
+    recognition.onend = () => {
+      recognition.start(); // Restart after end for continuous listening
+    };
 
-            recognition.start();
+    // Utility functions
+    function handleCommand(id, message) {
+      highlightToolbar(id);
+      speak(message);
+      actionFeedback.textContent = message;
+    }
 
-            recognition.onresult = function(event) {
-                const command = event.results[0][0].transcript.trim().toLowerCase();
-                console.log("You said:", command);
+    function highlightToolbar(id) {
+      document.querySelectorAll(".toolbar li").forEach(li => li.classList.remove('active'));
+      const item = document.getElementById(id);
+      if (item) item.classList.add('active');
+    }
 
-                const validOptions = ['compose', 'inbox', 'sent', 'star', 'trash', 'archive'];
-                if (validOptions.includes(command)) {
-                    const confirmMsg = new SpeechSynthesisUtterance("Redirecting to " + command + " page.");
-                    confirmMsg.onend = function () {
-                        redirectToPage(command);
-                    };
-                    speechSynthesis.speak(confirmMsg);
-                } else {
-                    const retryMsg = new SpeechSynthesisUtterance("Invalid option. Please say Compose, Inbox, Sent, Star, Trash or Archive.");
-                    retryMsg.onend = function () {
-                        listenForCommand();
-                    };
-                    speechSynthesis.speak(retryMsg);
-                }
-            };
-
-            recognition.onerror = function() {
-                const errorMsg = new SpeechSynthesisUtterance("Sorry, I did not catch that. Please try again.");
-                errorMsg.onend = function () {
-                    listenForCommand();
-                };
-                speechSynthesis.speak(errorMsg);
-            };
-        }
-
-        function redirectToPage(option) {
-            const djangoRoutes = {
-                'compose': '/compose/',
-                'inbox': '/inbox/',
-                'sent': '/sent/',
-                'star': '/star/',
-                'trash': '/trash/',
-                'archive': '/archive/'
-            };
-            window.location.href = djangoRoutes[option];
-        }
-    </script>
+    function redirectTo(option) {
+      const djangoRoutes = {
+        'compose': '/compose/',
+        'inbox': '/inbox/',
+        'sent': '/sent/',
+        'starred': '/star/',
+        'trash': '/trash/',
+        'archive': '/archive/',
+        'logout': '/logout/'
+      };
+      window.location.href = djangoRoutes[option];
+    }
+  </script>
 </body>
 </html>

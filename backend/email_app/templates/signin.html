@@ -1,36 +1,294 @@
-{% load static %}
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Talking Mailbox - Login</title>
-    <link rel="stylesheet" href="{% static 'css/login.css' %}">
+    <title>Talking Mail Box - Sign In</title>
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #6B73FF 0%, #000DFF 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: #333;
+        }
+        .signin-box {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            padding: 2.5rem;
+            width: 90%;
+            max-width: 450px;
+            margin-top: 3rem;
+        }
+        .signin-box h2 {
+            color: #3A3A3A;
+            text-align: center;
+            margin-bottom: 2rem;
+            font-size: 1.8rem;
+        }
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #4A4A4A;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #E0E0E0;
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+        .voice-status {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background: #F8F9FA;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 0.9rem;
+            color: #5A5A5A;
+        }
+    </style>
 </head>
 <body>
-    <div class="welcome-container">
-        <div class="welcome-message">Welcome to the SignIn Page</div>
-    </div>
-    
-    <div class="login-container">
-        <div class="login-title">Login</div>
-        <div class="input-group">
-            <label for="email">Email</label>
-            <input type="email" id="email" placeholder="Enter your email">
-            <div class="voice-prompt" id="email-prompt"></div>
+    <div class="signin-box">
+        <h2>Sign In</h2>
+        <form id="signinForm" method="post" action="{% url 'process_signin' %}">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" name="email" required autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required autocomplete="off">
+            </div>
+            <button type="submit" style="display:none;">Sign In</button>
+        </form>
+        <div class="voice-status" id="voiceStatus">
+            Voice system ready. Please wait...
         </div>
-        <div class="input-group">
-            <label for="password">Password</label>
-            <input type="password" id="password" placeholder="Enter your password">
-            <div class="voice-prompt" id="password-prompt"></div>
-        </div>
-        <div class="status-message" id="status-message"></div>
     </div>
 
-    <div class="particles" id="particles"></div>
+    <script>
+const synth = window.speechSynthesis;
+const voiceStatus = document.getElementById('voiceStatus');
+const form = document.getElementById('signinForm');
+let recognition = null;
+let userData = { email: '', password: '' };
 
-    <script src="https://code.responsivevoice.org/responsivevoice.js"></script>
-    <script src="{% static 'js/voice.js' %}"></script>
+function resetRecognition() {
+    if (recognition) {
+        recognition.abort();
+        recognition.onresult = null;
+        recognition.onerror = null;
+    }
+}
+
+function speak(text, callback, delay = 1000) {
+    if (synth.speaking) synth.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.95;
+    utterance.pitch = 1;
+    utterance.onend = () => callback && setTimeout(callback, delay);
+    synth.speak(utterance);
+    voiceStatus.textContent = text;
+}
+
+function startFieldRecognition(field) {
+    resetRecognition();
+    recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 3;
+
+    speak(`Please say your ${field === 'email' ? 'email address' : 'password'}.`, () => {
+        recognition.onresult = (event) => {
+            let transcript = event.results[0][0].transcript.trim();
+            if (field === 'email') {
+                transcript = transcript.replace(/\s+at\s+/gi, "@").replace(/\s+dot\s+/gi, ".").replace(/\s/g, "");
+            }
+            userData[field] = transcript;
+            document.getElementById(field).value = transcript;
+            confirmField(field, transcript);
+        };
+        recognition.onerror = () => {
+            speak("Sorry, I didn't catch that. Let's try again.", () => startFieldRecognition(field));
+        };
+        recognition.start();
+    });
+}
+
+function confirmField(field, value) {
+    let valid = true;
+    let prompt = '';
+
+    if (field === 'email') {
+        if (!validateEmail(value)) {
+            prompt = "That doesn't sound like a valid email. Please try again.";
+            valid = false;
+        } else {
+            prompt = `You said ${value} as your email. Is this correct? Say YES or NO.`;
+        }
+    } else if (field === 'password') {
+        if (value.length < 6) {
+            prompt = "Password must be at least 6 characters. Please try again.";
+            valid = false;
+        } else {
+            prompt = "You set your password. Is this correct? Say YES or NO.";
+        }
+    }
+
+    speak(prompt, () => startFieldConfirmation(field, valid));
+}
+
+function startFieldConfirmation(field, valid) {
+    resetRecognition();
+    recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 3;
+
+    recognition.onresult = (event) => {
+        const results = event.results[0];
+        let response = '';
+        for (let i = 0; i < results.length; i++) {
+            const transcript = results[i].transcript.trim().toLowerCase();
+            if (transcript.includes("yes")) {
+                response = "yes";
+                break;
+            }
+            if (transcript.includes("no")) {
+                response = "no";
+                break;
+            }
+        }
+
+        if (response === "yes" && valid) {
+            if (field === 'email') {
+                startFieldRecognition('password');
+            } else {
+                finalConfirmation();
+            }
+        } else {
+            speak(`Let's try your ${field === 'email' ? 'email address' : 'password'} again.`, () => startFieldRecognition(field));
+        }
+    };
+
+    recognition.onerror = () => {
+        speak("I didn't understand that. Please say YES or NO.", () => startFieldConfirmation(field, valid));
+    };
+
+    recognition.start();
+}
+
+function finalConfirmation() {
+    const summary = `You entered email: ${userData.email}. Password is set. Is this correct? Say YES to sign in or NO to start over.`;
+    speak(summary, () => {
+        resetRecognition();
+        recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 3;
+
+        recognition.onresult = (event) => {
+            const results = event.results[0];
+            let response = '';
+            for (let i = 0; i < results.length; i++) {
+                const transcript = results[i].transcript.trim().toLowerCase();
+                if (transcript.includes('yes')) { response = 'yes'; break; }
+                if (transcript.includes('no')) { response = 'no'; break; }
+            }
+
+            if (response === 'yes') {
+                speak("Signing you in. Please wait...", () => submitForm());
+            } else if (response === 'no') {
+                speak("Restarting sign in process.", () => {
+                    resetForm();
+                    startVoiceSignin();
+                });
+            } else {
+                speak("Please say YES to sign in or NO to restart.", () => finalConfirmation());
+            }
+        };
+
+        recognition.onerror = () => {
+            speak("Sorry, I didn't understand. Please say YES or NO.", () => finalConfirmation());
+        };
+
+        recognition.start();
+    });
+}
+
+function submitForm() {
+    const formData = {
+        email: userData.email,
+        password: userData.password,
+        csrfmiddlewaretoken: document.querySelector('[name=csrfmiddlewaretoken]').value
+    };
+
+    fetch(form.action, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': formData.csrfmiddlewaretoken
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success && data.redirect_url) {
+            speak("Sign in successful. Redirecting to your dashboard.", () => {
+                window.location.href = data.redirect_url;
+            });
+        } else {
+            speak(data.message || "Sign in failed. Please try again.", () => {
+                window.location.reload();
+            });
+        }
+    })
+    .catch(() => {
+        speak("There was a problem signing you in. Please try again.", () => {
+            window.location.reload();
+        });
+    });
+}
+
+function validateEmail(email) {
+    return email.includes('@') && email.includes('.') && email.length > 5;
+}
+
+function resetForm() {
+    userData = { email: '', password: '' };
+    document.getElementById('email').value = '';
+    document.getElementById('password').value = '';
+}
+
+function startVoiceSignin() {
+    speak("Welcome to the sign in page. Let's get started.", () => {
+        startFieldRecognition('email');
+    });
+}
+
+window.onload = () => {
+    setTimeout(() => {
+        if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+            voiceStatus.textContent = "Voice commands not supported in your browser.";
+            return;
+        }
+        navigator.mediaDevices.getUserMedia({ audio: true })
+            .then(() => startVoiceSignin())
+            .catch(() => {
+                voiceStatus.textContent = "Please allow microphone access.";
+            });
+    }, 500);
+};
+    </script>
 </body>
 </html>
