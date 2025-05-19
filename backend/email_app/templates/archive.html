@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Archive - Talking Mailbox</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: linear-gradient(to right, #2c3e50, #2980b9);
+      color: #fff;
+    }
+
+    header {
+      background-color: #1c2833;
+      padding: 15px 25px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .logo {
+      font-size: 22px;
+      font-weight: bold;
+    }
+
+    .container {
+      padding: 20px;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 28px;
+      margin-bottom: 30px;
+    }
+
+    .email {
+      background-color: #34495e;
+      margin: 10px auto;
+      padding: 15px;
+      border-radius: 10px;
+      width: 80%;
+      box-shadow: 0 0 10px rgba(0,0,0,0.4);
+    }
+
+    .instructions {
+      text-align: center;
+      font-style: italic;
+      margin-top: 30px;
+      font-size: 16px;
+      color: #ddd;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">📁 Archive - Talking Mailbox</div>
+  </header>
+
+  <div class="container">
+    <h1>Archived Emails</h1>
+
+    <!-- Example archived emails -->
+    <div class="email" id="mail1">1. Subject: Monthly Report | From: manager@company.com</div>
+    <div class="email" id="mail2">2. Subject: Invitation to Event | From: events@org.com</div>
+    <div class="email" id="mail3">3. Subject: Payment Received | From: billing@service.com</div>
+
+    <div class="instructions">
+      Say commands like "read mail one", "move to inbox two", "delete mail three", or "go back to dashboard".
+    </div>
+  </div>
+
+  <script>
+    const synth = window.speechSynthesis;
+
+    function speak(text, callback = null) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'en-US';
+      synth.speak(utterance);
+      if (callback) {
+        utterance.onend = callback;
+      }
+    }
+
+    window.onload = () => {
+      // Start immediately on page load
+      speak(
+        "Welcome to the Archive page of Talking Mailbox. " +
+        "You can say commands like read mail one, move to inbox two, delete mail three, go back to dashboard, or logout.",
+        () => {
+          setTimeout(startListening, 1000);
+        }
+      );
+    };
+
+    function startListening() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'en-US';
+      recognition.continuous = false;
+      recognition.interimResults = false;
+
+      recognition.start();
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript.toLowerCase();
+        handleCommand(transcript);
+      };
+
+      recognition.onend = () => {
+        // Restart listening after each command
+        setTimeout(startListening, 1000);
+      };
+    }
+
+    function handleCommand(command) {
+      const number = extractNumber(command);
+
+      if (command.includes("read mail") && number) {
+        const mail = document.getElementById(`mail${number}`);
+        if (mail) speak(mail.textContent);
+        else speak(`Mail number ${number} not found.`);
+
+      } else if ((command.includes("move to inbox") || command.includes("retrieve")) && number) {
+        const mail = document.getElementById(`mail${number}`);
+        if (mail) {
+          speak(`Mail number ${number} has been moved to inbox.`);
+          mail.remove(); // Simulate moving
+        } else {
+          speak(`Mail number ${number} not found.`);
+        }
+
+      } else if (command.includes("delete mail") && number) {
+        const mail = document.getElementById(`mail${number}`);
+        if (mail) {
+          speak(`Mail number ${number} deleted permanently.`);
+          mail.remove(); // Simulate deletion
+        } else {
+          speak(`Mail number ${number} not found.`);
+        }
+
+      } else if (command.includes("dashboard") || command.includes("go back")) {
+        speak("Redirecting to dashboard.");
+        setTimeout(() => {
+          window.location.href = "dashboard.html";
+        }, 3000);
+
+      } else if (command.includes("logout") || command.includes("sign out")) {
+        speak("Logging out and returning to login page.");
+        setTimeout(() => {
+          window.location.href = "login.html";
+        }, 3000);
+
+      } else {
+        speak("Sorry, I didn't understand that command. Please try again.");
+      }
+    }
+
+    function extractNumber(command) {
+      const match = command.match(/\d+/);
+      return match ? match[0] : null;
+    }
+  </script>
+</body>
+</html>

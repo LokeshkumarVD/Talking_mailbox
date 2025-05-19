@@ -18,13 +18,24 @@ class Email(models.Model):
     owner = models.ForeignKey(
         TalkingMailboxUser,
         on_delete=models.CASCADE,
-        related_name='emails'  # This avoids the reverse conflict with the 'email' field
+        related_name='emails'
     )
     to = models.EmailField()
     subject = models.CharField(max_length=255)
     message = models.TextField()
     sent_at = models.DateTimeField(auto_now_add=True)
-    folder = models.CharField(max_length=20, default='sent')  # sent/inbox/etc.
+    folder = models.CharField(max_length=20, default='sent')  # sent/inbox/starred/trash
 
     def __str__(self):
         return f"{self.subject} to {self.to} ({self.owner.username})"
+
+
+#class SentMail(models.Model):
+#    sender = models.ForeignKey(User, on_delete=models.CASCADE)
+ #   to = models.EmailField()
+  #  subject = models.CharField(max_length=255)
+   # message = models.TextField()
+    #sent_at = models.DateTimeField(auto_now_add=True)
+
+    #def __str__(self):
+     #   return f"To: {self.to} | Subject: {self.subject}"

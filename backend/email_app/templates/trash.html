@@ -1,0 +1,233 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Trash – The Talking Mailbox</title>
+  <style>
+    body {
+      margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f9f9f9;
+      color: #333;
+      display: flex; flex-direction: column; height: 100vh;
+    }
+    header {
+      background-color: #d93025;
+      color: white;
+      padding: 1.5rem 2rem;
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 1.3rem;
+      flex-shrink: 0;
+      font-weight: bold;
+      user-select: none;
+    }
+    #voiceStatus {
+      font-size: 1rem;
+      color: #ffe6e1;
+      margin-left: 1rem;
+      font-style: italic;
+    }
+    main.content {
+      flex-grow: 1;
+      padding: 2rem 3rem;
+      background: white;
+      margin: 1rem;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      overflow-y: auto;
+    }
+    #emailDisplay {
+      border: 2px solid #d93025;
+      border-radius: 8px;
+      background-color: #fdecea;
+      padding: 1.5rem;
+      margin-top: 1rem;
+      min-height: 180px;
+      user-select: text;
+      outline: none;
+    }
+    #emailSubject {
+      font-weight: 700;
+      font-size: 1.6rem;
+      color: #b71c1c;
+      margin-bottom: 1rem;
+    }
+    #emailBody {
+      font-size: 1.2rem;
+      line-height: 1.5;
+      white-space: pre-wrap;
+    }
+    #instructions {
+      margin-top: 2rem;
+      color: #555;
+      font-style: italic;
+      font-size: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🗑️ Trash – Talking Mailbox</h1>
+    <span id="voiceStatus">🎤 Voice Assistant: Initializing...</span>
+  </header>
+
+  <main class="content" role="main" aria-live="polite" aria-atomic="true" tabindex="0">
+    <h2 id="statusText">Loading Trash Mails...</h2>
+
+    <section id="emailDisplay" tabindex="0" aria-label="Trash email content">
+      <div id="emailSubject">Subject will appear here...</div>
+      <div id="emailBody">Email content will appear here...</div>
+    </section>
+
+    <div id="instructions">
+      You can say: <strong>next</strong>, <strong>repeat</strong>, <strong>retrieve</strong>, <strong>dashboard</strong>, or <strong>logout</strong>.
+    </div>
+
+    <!-- Dummy trash emails, to be replaced by Django backend -->
+    <div id="emails" style="display:none;">
+      <div data-subject="Old Promotion" data-body="This was a promotional email from last year."></div>
+      <div data-subject="Meeting Canceled" data-body="The meeting scheduled for tomorrow has been canceled."></div>
+      <div data-subject="Spam Alert" data-body="You received a suspicious link. Do not click on it."></div>
+    </div>
+  </main>
+
+<script>
+  const voiceStatus = document.getElementById('voiceStatus');
+  const statusText = document.getElementById('statusText');
+  const emailSubjectEl = document.getElementById('emailSubject');
+  const emailBodyEl = document.getElementById('emailBody');
+  const emails = Array.from(document.querySelectorAll("#emails div"));
+
+  let currentIndex = 0;
+  let reading = false;
+
+  // Simulated backend data arrays for Inbox and Trash
+  // In real app, backend would update these
+  let inboxEmails = [
+    {subject: "Welcome Back!", body: "Your inbox is ready."}
+  ];
+  let trashEmails = emails.map(e => ({subject: e.dataset.subject, body: e.dataset.body}));
+
+  // Text-to-Speech
+  function speak(text, callback=null) {
+    const synth = window.speechSynthesis;
+    synth.cancel();
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.rate = 1;
+    utter.onstart = () => voiceStatus.textContent = "🎤 Voice Assistant: Speaking...";
+    utter.onend = () => {
+      voiceStatus.textContent = "🎤 Voice Assistant: Listening...";
+      if (callback) callback();
+    };
+    synth.speak(utter);
+  }
+
+  // Speech Recognition Setup
+  window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const recognition = new window.SpeechRecognition();
+  recognition.continuous = true;
+  recognition.interimResults = false;
+  recognition.lang = 'en-US';
+
+  recognition.onresult = (event) => {
+    const lastResult = event.results[event.results.length - 1];
+    if (lastResult.isFinal) {
+      const transcript = lastResult[0].transcript.trim().toLowerCase();
+      voiceStatus.textContent = `🎤 Heard: "${transcript}"`;
+      if (!reading) handleCommand(transcript);
+    }
+  };
+
+  recognition.onerror = (e) => {
+    voiceStatus.textContent = `🎤 Error: ${e.error}`;
+  };
+
+  recognition.onend = () => {
+    recognition.start(); // keep it always listening
+  };
+
+  // Show current email on screen and read it aloud
+  function readCurrentEmail() {
+    if (currentIndex >= trashEmails.length) {
+      emailSubjectEl.textContent = "";
+      emailBodyEl.textContent = "";
+      speak("You have no more emails in trash. Say dashboard to return to main menu.");
+      statusText.textContent = "End of trash emails.";
+      return;
+    }
+    const email = trashEmails[currentIndex];
+    emailSubjectEl.textContent = `Subject: ${email.subject}`;
+    emailBodyEl.textContent = email.body;
+    statusText.textContent = `Reading trash email ${currentIndex + 1} of ${trashEmails.length}`;
+
+    reading = true;
+    speak(`Trash email ${currentIndex + 1}. Subject: ${email.subject}. Message: ${email.body}`, () => {
+      reading = false;
+      speak("Say next to hear next email, repeat to hear again, retrieve to restore this email, dashboard to go back, or logout to sign out.");
+    });
+  }
+
+  // Handle voice commands
+  function handleCommand(command) {
+    if (command.includes("next")) {
+      currentIndex++;
+      readCurrentEmail();
+    }
+    else if (command.includes("repeat")) {
+      readCurrentEmail();
+    }
+    else if (command.includes("retrieve")) {
+      if (trashEmails.length === 0) {
+        speak("Trash is empty. Nothing to retrieve.");
+        return;
+      }
+      retrieveEmail();
+    }
+    else if (command.includes("dashboard")) {
+      speak("Returning to dashboard.");
+      setTimeout(() => window.location.href = "/dashboard/", 2000);
+    }
+    else if (command.includes("logout")) {
+      speak("Logging out.");
+      setTimeout(() => window.location.href = "/logout/", 2000);
+    }
+    else {
+      speak("Sorry, I did not understand. Please say next, repeat, retrieve, dashboard, or logout.");
+    }
+  }
+
+  // Retrieve current trash email back to inbox
+  function retrieveEmail() {
+    const email = trashEmails[currentIndex];
+    speak(`Retrieving email: Subject: ${email.subject}. Moving it back to inbox.`, () => {
+      // Remove from trash
+      trashEmails.splice(currentIndex, 1);
+      // Add to inbox
+      inboxEmails.push(email);
+
+      if (currentIndex >= trashEmails.length) {
+        currentIndex = trashEmails.length - 1;
+      }
+      if (trashEmails.length === 0) {
+        emailSubjectEl.textContent = "";
+        emailBodyEl.textContent = "";
+        statusText.textContent = "Trash is now empty.";
+        speak("Trash is now empty. Say dashboard to return to main menu.");
+        return;
+      }
+      readCurrentEmail();
+    });
+  }
+
+  // Start everything on page load
+  document.addEventListener('DOMContentLoaded', () => {
+    const username = localStorage.getItem("username") || "User";
+    speak(`Welcome ${username} to your Trash mailbox. You have ${trashEmails.length} emails in trash.`, () => {
+      speak("I will start reading them. You can say next, repeat, retrieve, dashboard, or logout anytime.");
+      setTimeout(readCurrentEmail, 3000);
+    });
+    recognition.start();
+  });
+</script>
+</body>
+</html>

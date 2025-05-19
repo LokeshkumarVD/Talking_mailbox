@@ -1,181 +1,203 @@
-{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Compose - Talking Mailbox</title>
-    <style>
-        body {
-            background: #121212;
-            color: white;
-            font-family: Arial, sans-serif;
-            padding: 20px;
-        }
-        .compose-box {
-            background-color: #1e1e1e;
-            border-radius: 12px;
-            padding: 30px;
-            max-width: 600px;
-            margin: 50px auto;
-        }
-        .compose-box h2 {
-            margin-bottom: 20px;
-            color: #00ffd5;
-        }
-        .field {
-            margin-bottom: 20px;
-        }
-        .field label {
-            display: block;
-            margin-bottom: 5px;
-        }
-        .field input, .field textarea {
-            width: 100%;
-            padding: 10px;
-            border-radius: 6px;
-            border: none;
-            font-size: 16px;
-        }
-        .status {
-            margin-top: 20px;
-            font-weight: bold;
-            color: #0f0;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Compose Email - Talking Mailbox</title>
+  <style>
+    body {
+      background: linear-gradient(to right, #2c3e50, #4ca1af);
+      font-family: Arial, sans-serif;
+      color: white;
+      margin: 0;
+      padding: 0;
+      cursor: pointer;
+    }
+    .container {
+      max-width: 700px;
+      margin: 50px auto;
+      background-color: #1a1a1a;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      margin-top: 15px;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      border-radius: 8px;
+      border: none;
+    }
+    button {
+      margin-top: 20px;
+      width: 100%;
+      padding: 10px;
+      background-color: #4ca1af;
+      border: none;
+      border-radius: 8px;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+    }
+  </style>
 </head>
 <body>
-    <div class="compose-box">
-        <h2>Voice Compose</h2>
-        <div class="field">
-            <label>To:</label>
-            <input type="text" id="to" readonly>
-        </div>
-        <div class="field">
-            <label>Subject:</label>
-            <input type="text" id="subject" readonly>
-        </div>
-        <div class="field">
-            <label>Message:</label>
-            <textarea id="message" rows="6" readonly></textarea>
-        </div>
-        <div class="status" id="statusMsg">Listening for your commands...</div>
-    </div>
+  <div class="container">
+    <h1>Compose Email</h1>
+    <form id="compose-form">
+      <label for="to">To:</label>
+      <input type="email" id="to" required />
 
-    <script>
-        let step = 'to';  // track current step
-        let to = '', subject = '', message = '';
+      <label for="subject">Subject:</label>
+      <input type="text" id="subject" required />
 
-        window.onload = () => {
-            speak("Welcome to Compose. Please say the recipient email address.");
-            startRecognition();
+      <label for="message">Message:</label>
+      <textarea id="message" rows="8" required></textarea>
+
+      <button type="submit">Send</button>
+    </form>
+  </div>
+
+  <script>
+    function speak(text, callback = null) {
+      const msg = new SpeechSynthesisUtterance(text);
+      msg.rate = 1;
+      msg.pitch = 1;
+      msg.lang = 'en-US';
+      msg.onend = () => {
+        if (callback) callback();
+      };
+      window.speechSynthesis.speak(msg);
+    }
+
+    function listen(callback, continuous = false, expectLongInput = false) {
+      const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+      recognition.lang = 'en-US';
+      recognition.interimResults = false;
+      recognition.continuous = continuous;
+
+      if (expectLongInput) {
+        let finalTranscript = '';
+        recognition.continuous = true;
+        recognition.interimResults = true;
+
+        recognition.onresult = function(event) {
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
+            const transcript = event.results[i][0].transcript.toLowerCase();
+            if (transcript.includes("end message")) {
+              finalTranscript += transcript.replace("end message", "").trim();
+              recognition.stop();
+              break;
+            } else if (event.results[i].isFinal) {
+              finalTranscript += transcript + ' ';
+            }
+          }
         };
 
-        function speak(text) {
-            const utter = new SpeechSynthesisUtterance(text);
-            speechSynthesis.speak(utter);
-        }
+        recognition.onend = function() {
+          callback(finalTranscript.trim());
+        };
 
-        function startRecognition() {
-            const recognition = new webkitSpeechRecognition();
-            recognition.lang = 'en-US';
-            recognition.interimResults = false;
-            recognition.continuous = false;
+        speak("Please start speaking your message. Say 'end message' when you are done.", () => {
+          recognition.start();
+        });
+      } else {
+        recognition.onresult = function(event) {
+          const result = event.results[0][0].transcript.trim();
+          callback(result);
+        };
 
-            recognition.onresult = (event) => {
-                let spoken = event.results[0][0].transcript.trim();
-                document.getElementById("statusMsg").textContent = "Heard: " + spoken;
+        recognition.onerror = function(event) {
+          speak("Sorry, I didn't catch that. Please repeat.", () => listen(callback));
+        };
 
-                if (step === 'to') {
-                    to = spoken.replace(/\s+/g, '').toLowerCase();
-                    document.getElementById('to').value = to;
-                    speak("You said " + to + ". Now say the subject.");
-                    step = 'subject';
-                } else if (step === 'subject') {
-                    subject = spoken;
-                    document.getElementById('subject').value = subject;
-                    speak("Subject recorded. Now say the message.");
-                    step = 'message';
-                } else if (step === 'message') {
-                    message = spoken;
-                    document.getElementById('message').value = message;
-                    speak("Message recorded. Say 'send mail' to send, or 'repeat' to try again.");
-                    step = 'send';
-                } else if (step === 'send') {
-                    let cmd = spoken.toLowerCase();
-                    if (cmd.includes('send mail') || cmd.includes('send email')) {
-                        sendEmail();
-                    } else if (cmd.includes('repeat')) {
-                        speak("Let's start again. Please say the recipient email address.");
-                        resetForm();
-                    } else {
-                        speak("Say 'send mail' to send or 'repeat' to try again.");
-                    }
-                }
-            };
+        recognition.start();
+      }
+    }
 
-            recognition.onerror = (e) => {
-                speak("I didn't catch that. Please try again.");
-            };
-
-            recognition.onend = () => {
-                if (step !== 'done') {
-                    recognition.start();  // keep listening
-                }
-            };
-
-            recognition.start();
-        }
-
-        function resetForm() {
-            step = 'to';
-            to = subject = message = '';
-            document.getElementById('to').value = '';
-            document.getElementById('subject').value = '';
-            document.getElementById('message').value = '';
-        }
-
-        function sendEmail() {
-            // Send data to Django backend with fetch POST
-            fetch("{% url 'compose' %}", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-CSRFToken": getCookie('csrftoken'),
-                },
-                body: JSON.stringify({ to, subject, message }),
-            })
-            .then(response => response.json())
-            .then(data => {
-                if(data.success) {
-                    speak("Email sent successfully. Redirecting to sent mails.");
-                    step = 'done';
-                    setTimeout(() => { window.location.href = "{% url 'sent' %}"; }, 4000);
-                } else {
-                    speak("Failed to send email. Please try again.");
-                    step = 'send';
-                }
-            })
-            .catch(() => {
-                speak("Error sending email. Please try again.");
-                step = 'send';
+    function confirmAndContinue(inputName, value, onConfirm) {
+      speak(`You said ${inputName} as: ${value}. Is this correct? Say yes to continue or no to repeat.`, () => {
+        listen((response) => {
+          if (response.toLowerCase().includes("yes")) {
+            onConfirm(value);
+          } else {
+            speak(`Please say the ${inputName} again.`, () => {
+              listen(onConfirm);
             });
-        }
+          }
+        });
+      });
+    }
 
-        // Helper function to get CSRF token cookie
-        function getCookie(name) {
-            let cookieValue = null;
-            if (document.cookie && document.cookie !== '') {
-                const cookies = document.cookie.split(';');
-                for (let i = 0; i < cookies.length; i++) {
-                    const cookie = cookies[i].trim();
-                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                        break;
-                    }
-                }
-            }
-            return cookieValue;
-        }
-    </script>
+    function fillField(fieldId, fieldName, nextCallback) {
+      speak(`Please say the ${fieldName}.`, () => {
+        const isMessage = fieldName === "message";
+        listen((value) => {
+          confirmAndContinue(fieldName, value, (confirmedValue) => {
+            document.getElementById(fieldId).value = confirmedValue;
+            if (nextCallback) nextCallback();
+          });
+        }, false, isMessage);
+      });
+    }
+
+    function handleSendConfirmation() {
+      speak("Your message is ready. Say 'send' to send the mail or say 'cancel' to discard.", () => {
+        listen(function processResponse(response) {
+          console.log("Voice response:", response); // Debug log
+          const cleaned = response.trim().toLowerCase();
+
+          const sendCommands = ["send", "send it", "send message", "send the message", "yes send", "go ahead"];
+          const cancelCommands = ["cancel", "discard", "no", "stop", "don't send"];
+
+          if (sendCommands.some(cmd => cleaned.includes(cmd))) {
+            speak("Email composition complete. Redirecting to dashboard.", () => {
+              window.location.href = "/dashboard/";
+            });
+          } else if (cancelCommands.some(cmd => cleaned.includes(cmd))) {
+            speak("Email composition canceled.");
+          } else {
+            speak("I didn't understand. Please say send to send the email or cancel to discard.", () => {
+              setTimeout(() => {
+                listen(processResponse);
+              }, 500);
+            });
+          }
+        });
+      });
+    }
+
+    function startVoiceCompose() {
+      speak("Welcome to the compose page of Talking Mailbox. I will guide you to compose a mail. You will be asked for receiver's email, subject and message. Let's begin.", () => {
+        fillField("to", "recipient email", () => {
+          fillField("subject", "subject", () => {
+            fillField("message", "message", () => {
+              handleSendConfirmation();
+            });
+          });
+        });
+      });
+    }
+
+    document.getElementById('compose-form').addEventListener('submit', function(event) {
+      event.preventDefault();
+    });
+
+    let hasStarted = false;
+    document.body.addEventListener("click", () => {
+      if (!hasStarted) {
+        hasStarted = true;
+        startVoiceCompose();
+      }
+    });
+  </script>
 </body>
 </html>

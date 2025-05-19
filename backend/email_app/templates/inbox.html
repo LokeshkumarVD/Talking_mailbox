@@ -1,0 +1,187 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Inbox – The Talking Mailbox</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #f1f3f4;
+      color: #222;
+    }
+
+    header {
+      background-color: #4285F4;
+      color: white;
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .container {
+      padding: 2rem;
+    }
+
+    h2 {
+      color: #4285F4;
+      margin-bottom: 1rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background-color: white;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+
+    th, td {
+      padding: 1rem;
+      border-bottom: 1px solid #ddd;
+      text-align: left;
+    }
+
+    th {
+      background-color: #eaf1fb;
+      color: #333;
+    }
+
+    tr:hover {
+      background-color: #f5f5f5;
+    }
+
+    .highlight {
+      background-color: #d2e3fc !important;
+    }
+
+    #voiceStatus {
+      font-size: 1rem;
+      color: #ffe066;
+    }
+
+    #actionFeedback {
+      margin-top: 1rem;
+      font-style: italic;
+      font-size: 1rem;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Inbox – The Talking Mailbox</h1>
+    <span id="voiceStatus">🎤 Voice Assistant: Listening...</span>
+  </header>
+
+  <div class="container">
+    <h2 id="welcomeText">Welcome to your Inbox</h2>
+    <div id="actionFeedback">Waiting for your command...</div>
+    <table>
+      <thead>
+        <tr>
+          <th>From</th>
+          <th>Subject</th>
+          <th>Date</th>
+        </tr>
+      </thead>
+      <tbody id="emailList">
+        <!-- Placeholder emails for demo -->
+        <tr>
+          <td>hema33@gmail.com</td>
+          <td>Hey we have an getogether on monday</td>
+          <td>May 17, 2025</td>
+        </tr>
+        <tr>
+          <td>amazon.in</td>
+          <td>Your order has been shipped</td>
+          <td>May 16, 2025</td>
+        </tr>
+        <tr>
+          <td>linkedin.com</td>
+          <td>Job recommendations for you</td>
+          <td>May 15, 2025</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    // Voice Setup
+    window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new window.SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = false;
+
+    const voiceStatus = document.getElementById("voiceStatus");
+    const actionFeedback = document.getElementById("actionFeedback");
+    const emailList = document.getElementById("emailList");
+    const welcomeText = document.getElementById("welcomeText");
+
+    // Welcome Message on Load
+    document.addEventListener('DOMContentLoaded', () => {
+      const user = localStorage.getItem("username") || "User";
+      welcomeText.textContent = `Welcome ${user}, here is your inbox.`;
+      speak(`Welcome ${user}. You are now in the inbox. You can say commands like Read First Mail, Read All, or Go Back.`);
+      recognition.start();
+    });
+
+    // Text-to-Speech
+    function speak(message) {
+      const synth = window.speechSynthesis;
+      synth.cancel();
+      const utter = new SpeechSynthesisUtterance(message);
+      utter.rate = 1;
+      synth.speak(utter);
+      voiceStatus.textContent = "🎤 Voice Assistant: " + message;
+    }
+
+    // Commands
+    const commands = {
+      "read first mail": () => {
+        const row = emailList.rows[0];
+        row.classList.add('highlight');
+        const from = row.cells[0].textContent;
+        const subject = row.cells[1].textContent;
+        speak(`First mail from ${from}. Subject is: ${subject}.`);
+      },
+      "read all": () => {
+        let text = "";
+        for (let row of emailList.rows) {
+          const from = row.cells[0].textContent;
+          const subject = row.cells[1].textContent;
+          text += `From ${from}. Subject: ${subject}. `;
+        }
+        speak(text);
+      },
+      "go back": () => {
+        speak("Returning to dashboard.");
+        setTimeout(() => window.location.href = "/dashboard/", 1500);
+      }
+    };
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
+      actionFeedback.textContent = `Heard: "${transcript}"`;
+
+      for (let cmd in commands) {
+        if (transcript.includes(cmd)) {
+          commands[cmd]();
+          return;
+        }
+      }
+      speak("Sorry, I didn't catch that. Please say again.");
+    };
+
+    recognition.onerror = (event) => {
+      actionFeedback.textContent = `Error: ${event.error}`;
+      voiceStatus.textContent = "🎤 Voice Assistant: Error";
+    };
+
+    recognition.onend = () => {
+      recognition.start();
+    };
+  </script>
+</body>
+</html>

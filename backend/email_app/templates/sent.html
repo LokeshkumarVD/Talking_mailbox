@@ -2,7 +2,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="UTF-8" />
     <title>Sent Mail – Talking Mailbox</title>
     <style>
         body {
@@ -10,6 +10,7 @@
             color: white;
             font-family: Arial, sans-serif;
             padding: 20px;
+            margin: 0;
         }
         .sent-box {
             background-color: #1e1e1e;
@@ -21,9 +22,12 @@
         .sent-box h2 {
             margin-bottom: 20px;
             color: #00ffd5;
+            text-align: center;
         }
         .mail-list {
             margin-top: 20px;
+            max-height: 60vh;
+            overflow-y: auto;
         }
         .mail-item {
             background: #232323;
@@ -31,42 +35,50 @@
             padding: 18px;
             margin-bottom: 18px;
             cursor: pointer;
-            transition: background 0.2s;
+            transition: background 0.2s, border 0.2s;
+            outline: none;
         }
-        .mail-item.selected, .mail-item:hover {
+        .mail-item.selected, .mail-item:hover, .mail-item:focus {
             background: #222e2e;
             border: 2px solid #00ffd5;
         }
         .mail-to {
             color: #00ffd5;
             font-weight: bold;
+            font-size: 1rem;
         }
         .mail-subject {
             font-size: 1.1rem;
             margin: 6px 0;
+            font-weight: 600;
         }
         .mail-message {
             color: #b2f7ef;
             margin-top: 8px;
+            white-space: pre-wrap;
+            font-size: 0.95rem;
+            max-height: 80px;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         .status {
-            margin-top: 20px;
+            margin-top: 15px;
             font-weight: bold;
             color: #0f0;
+            text-align: center;
         }
     </style>
 </head>
 <body>
-    <div class="sent-box">
+    <div class="sent-box" role="main" aria-label="Sent mail list">
         <h2>Sent Mail</h2>
-        <div class="status" id="statusMsg">Loading your sent mails...</div>
-        <div class="mail-list" id="mailList">
-            <!-- Example mails, replace with Django context in production -->
+        <div class="status" id="statusMsg" aria-live="polite">Loading your sent mails...</div>
+        <div class="mail-list" id="mailList" tabindex="0" aria-label="List of sent emails">
             {% for mail in sent_mails %}
-            <div class="mail-item" tabindex="0" data-mail="{{ mail.id }}">
+            <div class="mail-item" tabindex="0" data-mail="{{ mail.id }}" aria-label="Mail to {{ mail.to }}, subject {{ mail.subject }}">
                 <div class="mail-to">To: {{ mail.to }}</div>
                 <div class="mail-subject">Subject: {{ mail.subject }}</div>
-                <div class="mail-message">{{ mail.message }}</div>
+                <div class="mail-message">{{ mail.message|linebreaksbr }}</div>
             </div>
             {% empty %}
             <div>No sent mails found.</div>
@@ -75,58 +87,22 @@
     </div>
 
     <script>
-        // --- Voice greeting and instructions ---
-        window.onload = () => {
-            speak("Welcome to your sent mail page.", () => {
-                speak("Here you can review all the emails you have sent. Click or say the number of a mail to select it. Say 'read mail' to hear the selected mail read aloud.");
-                document.getElementById('statusMsg').textContent = "Say 'read mail' to hear the selected mail.";
-                startRecognition();
-            });
-        };
-
-        // --- Text-to-speech ---
+        // Text-to-speech helper
         function speak(text, callback) {
             const utter = new SpeechSynthesisUtterance(text);
             utter.rate = 1;
+            utter.lang = 'en-US';
             utter.onend = () => { if (callback) setTimeout(callback, 400); };
-            speechSynthesis.speak(utter);
+            window.speechSynthesis.speak(utter);
         }
 
-        // --- Voice recognition ---
-        function startRecognition() {
-            window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            const recognition = new SpeechRecognition();
-            recognition.lang = 'en-US';
-            recognition.interimResults = false;
-            recognition.continuous = true;
-
-            recognition.onresult = (event) => {
-                const transcript = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
-                document.getElementById('statusMsg').textContent = `Heard: "${transcript}"`;
-
-                if (transcript.includes('read mail') || transcript.includes('read message')) {
-                    readSelectedMail();
-                } else if (transcript.match(/mail (\d+)/)) {
-                    // User said "mail 2" or "mail 1" etc.
-                    const idx = parseInt(transcript.match(/mail (\d+)/)[1], 10) - 1;
-                    selectMailByIndex(idx);
-                }
-            };
-
-            recognition.onerror = () => {
-                document.getElementById('statusMsg').textContent = "Voice recognition error. Please try again.";
-            };
-
-            recognition.onend = () => {
-                recognition.start();
-            };
-
-            recognition.start();
-        }
-
-        // --- Mail selection and reading ---
+        // Select mail by index (0-based)
         function selectMailByIndex(idx) {
             const mails = document.querySelectorAll('.mail-item');
+            if (mails.length === 0) {
+                speak("You have no sent mails.");
+                return;
+            }
             if (mails[idx]) {
                 mails.forEach(m => m.classList.remove('selected'));
                 mails[idx].classList.add('selected');
@@ -137,6 +113,7 @@
             }
         }
 
+        // Read aloud the selected mail's details
         function readSelectedMail() {
             const selected = document.querySelector('.mail-item.selected') || document.querySelector('.mail-item');
             if (selected) {
@@ -149,7 +126,58 @@
             }
         }
 
-        // --- Allow click to select mail ---
+        // Start speech recognition for commands
+        function startRecognition() {
+            if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
+                document.getElementById('statusMsg').textContent = "Speech Recognition not supported in this browser.";
+                return;
+            }
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'en-US';
+            recognition.interimResults = false;
+            recognition.continuous = true;
+
+            recognition.onresult = (event) => {
+                const transcript = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
+                document.getElementById('statusMsg').textContent = `Heard: "${transcript}"`;
+
+                if (transcript.includes('read mail') || transcript.includes('read message')) {
+                    readSelectedMail();
+                } else if (/mail\s+\d+/.test(transcript)) {
+                    const idxMatch = transcript.match(/mail\s+(\d+)/);
+                    if (idxMatch && idxMatch[1]) {
+                        selectMailByIndex(parseInt(idxMatch[1], 10) - 1);
+                    }
+                } else if (transcript.includes('next mail')) {
+                    // Select next mail if available
+                    const mails = [...document.querySelectorAll('.mail-item')];
+                    let selectedIdx = mails.findIndex(m => m.classList.contains('selected'));
+                    if (selectedIdx === -1) selectedIdx = 0;
+                    else selectedIdx = Math.min(selectedIdx + 1, mails.length - 1);
+                    selectMailByIndex(selectedIdx);
+                } else if (transcript.includes('previous mail') || transcript.includes('back mail')) {
+                    const mails = [...document.querySelectorAll('.mail-item')];
+                    let selectedIdx = mails.findIndex(m => m.classList.contains('selected'));
+                    if (selectedIdx === -1) selectedIdx = 0;
+                    else selectedIdx = Math.max(selectedIdx - 1, 0);
+                    selectMailByIndex(selectedIdx);
+                }
+            };
+
+            recognition.onerror = (event) => {
+                document.getElementById('statusMsg').textContent = "Voice recognition error. Please try again.";
+            };
+
+            recognition.onend = () => {
+                // Restart recognition for continuous listening
+                recognition.start();
+            };
+
+            recognition.start();
+        }
+
+        // Handle click to select mail
         document.addEventListener('DOMContentLoaded', () => {
             const mails = document.querySelectorAll('.mail-item');
             mails.forEach((mail, idx) => {
@@ -159,6 +187,13 @@
                     mail.focus();
                     speak(`Mail ${idx + 1} selected. Say 'read mail' to hear its content.`);
                 });
+            });
+
+            // Start voice interaction after page load
+            speak("Welcome to your sent mail page.", () => {
+                speak("Here you can review all the emails you have sent. Click or say the number of a mail to select it. Say 'read mail' to hear the selected mail read aloud.");
+                document.getElementById('statusMsg').textContent = "Say 'read mail' to hear the selected mail.";
+                startRecognition();
             });
         });
     </script>

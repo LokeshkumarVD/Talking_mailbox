@@ -143,6 +143,38 @@ def sent_mail_page(request):
     sent_mails = Email.objects.filter(owner=user, folder='sent').order_by('-sent_at')
     return render(request, 'sent.html', {'sent_mails': sent_mails})
 
+@csrf_exempt
+def send_email(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            sender_email = data.get('from')
+            to = data.get('to')
+            subject = data.get('subject')
+            message = data.get('message')
+
+            # find the sender in your DB
+            if not all([sender_email, to, subject, message]):
+                return JsonResponse({'error': 'All fields are required'}, status=400)
+            
+            try:
+                sender = TalkingMailboxUser.objects.get(email=sender_email)
+            except TalkingMailboxUser.DoesNotExist:
+                return JsonResponse({'error': 'Sender not found'}, status=404)
+
+            Email.objects.create(
+                owner=sender,
+                to=to,
+                subject=subject,
+                message=message,
+                folder='sent'
+            )
+
+            return JsonResponse({'message': 'Email sent successfully!'})
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    else:
+        return JsonResponse({'error': 'Invalid request method'}, status=400)
 
 # View for Inbox
 def inbox_page(request):

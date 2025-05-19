@@ -1,0 +1,197 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Starred – The Talking Mailbox</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #f5f7fa;
+      color: #222;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    header {
+      background-color: #4285F4;
+      color: white;
+      padding: 1.2rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 1.2rem;
+      flex-shrink: 0;
+    }
+    #voiceStatus {
+      font-size: 1rem;
+      margin-left: 1rem;
+      color: #ffe066;
+    }
+    .content {
+      padding: 2rem 3rem;
+      flex-grow: 1;
+      overflow-y: auto;
+      background: white;
+      margin: 1rem;
+      border-radius: 10px;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+    }
+    #emailDisplay {
+      margin-top: 2rem;
+      padding: 1.5rem;
+      border: 2px solid #4285F4;
+      border-radius: 8px;
+      background-color: #e8f0fe;
+    }
+    #emailSubject {
+      font-weight: 700;
+      font-size: 1.5rem;
+      margin-bottom: 1rem;
+      color: #0b57d0;
+    }
+    #emailBody {
+      font-size: 1.2rem;
+      line-height: 1.5;
+    }
+    #instructions {
+      margin-top: 2rem;
+      font-style: italic;
+      color: #555;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>⭐ Starred – Talking Mailbox</h1>
+    <span id="voiceStatus">🎤 Voice Assistant: Initializing...</span>
+  </header>
+
+  <main class="content">
+    <h2 id="statusText">Loading Starred Mails...</h2>
+
+    <!-- Display area for current email -->
+    <section id="emailDisplay" aria-live="polite" aria-atomic="true" role="region" tabindex="0">
+      <div id="emailSubject">Subject will appear here...</div>
+      <div id="emailBody">Email content will appear here...</div>
+    </section>
+
+    <div id="instructions">
+      Commands you can say: <strong>next</strong>, <strong>repeat</strong>, <strong>dashboard</strong>, <strong>logout</strong>.
+    </div>
+
+    <!-- Starred Emails (dummy data for now) -->
+    <div id="emails" style="display:none;">
+      <div data-subject="Team Meeting" data-body="Don't forget our team meeting at 3 PM. Please join via the Zoom link."></div>
+      <div data-subject="Invoice Reminder" data-body="Your invoice for April is pending. Kindly make the payment by Friday."></div>
+      <div data-subject="Feedback Request" data-body="We'd love your feedback on our new support feature. Fill the form linked in this mail."></div>
+    </div>
+  </main>
+
+  <script>
+    const voiceStatus = document.getElementById('voiceStatus');
+    const statusText = document.getElementById('statusText');
+    const emailSubjectEl = document.getElementById('emailSubject');
+    const emailBodyEl = document.getElementById('emailBody');
+    const emails = Array.from(document.querySelectorAll("#emails div"));
+
+    let currentIndex = 0;
+    let reading = false;
+
+    // Text-to-Speech function
+    function speak(text, callback = null) {
+      const synth = window.speechSynthesis;
+      synth.cancel();
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.rate = 1;
+      utter.onstart = () => voiceStatus.textContent = "🎤 Voice Assistant: Speaking...";
+      utter.onend = () => {
+        voiceStatus.textContent = "🎤 Voice Assistant: Listening...";
+        if (callback) callback();
+      };
+      synth.speak(utter);
+    }
+
+    // Speech Recognition Setup
+    window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new window.SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+
+    recognition.onresult = (event) => {
+      const lastResult = event.results[event.results.length - 1];
+      if (lastResult.isFinal) {
+        const transcript = lastResult[0].transcript.trim().toLowerCase();
+        voiceStatus.textContent = `🎤 Heard: "${transcript}"`;
+        if (!reading) handleCommand(transcript);
+      }
+    };
+
+    recognition.onerror = (e) => {
+      voiceStatus.textContent = `🎤 Error: ${e.error}`;
+    };
+
+    recognition.onend = () => {
+      recognition.start(); // Keep recognition always on
+    };
+
+    // Show current email on screen and speak it
+    function readCurrentEmail() {
+      if (currentIndex >= emails.length) {
+        emailSubjectEl.textContent = "";
+        emailBodyEl.textContent = "";
+        speak("You have no more starred emails. Say dashboard to return to main menu.");
+        statusText.textContent = "End of starred emails.";
+        return;
+      }
+      const email = emails[currentIndex];
+      const subject = email.dataset.subject;
+      const body = email.dataset.body;
+
+      // Update visible content
+      emailSubjectEl.textContent = `Subject: ${subject}`;
+      emailBodyEl.textContent = body;
+      statusText.textContent = `Reading email ${currentIndex + 1} of ${emails.length}`;
+
+      reading = true;
+      speak(`Email ${currentIndex + 1}. Subject: ${subject}. Message: ${body}`, () => {
+        reading = false;
+        speak("Say next to hear the next mail, repeat to hear again, dashboard to go back, or logout to sign out.");
+      });
+    }
+
+    // Command handler function
+    function handleCommand(command) {
+      if (command.includes("next")) {
+        currentIndex++;
+        readCurrentEmail();
+      } else if (command.includes("repeat")) {
+        readCurrentEmail();
+      } else if (command.includes("dashboard")) {
+        speak("Returning to dashboard.");
+        setTimeout(() => window.location.href = "/dashboard/", 2000);
+      } else if (command.includes("logout")) {
+        speak("Logging out.");
+        setTimeout(() => window.location.href = "/logout/", 2000);
+      } else {
+        speak("Sorry, I did not understand. Please say next, repeat, dashboard, or logout.");
+      }
+    }
+
+    // On page load: greet and start reading
+    document.addEventListener('DOMContentLoaded', () => {
+      const username = localStorage.getItem("username") || "User";
+      speak(`Welcome ${username} to your starred mailbox. You have ${emails.length} starred emails.`, () => {
+        speak("I will start reading them one by one. Say next, repeat, dashboard, or logout anytime.");
+        setTimeout(readCurrentEmail, 3000);
+      });
+
+      recognition.start();
+    });
+  </script>
+
+</body>
+</html>
